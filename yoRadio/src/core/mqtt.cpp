@@ -22,6 +22,9 @@ void mqttInit() {
   mqttClient.onMessage(onMqttMessage);
   if(strlen(MQTT_USER)>0) mqttClient.setCredentials(MQTT_USER, MQTT_PASS);
   mqttClient.setServer(MQTT_HOST, MQTT_PORT);
+  memset(topic, 0, 140);
+  sprintf(topic, "%s%s", MQTT_ROOT_TOPIC, "connection");
+  mqttClient.setWill(topic, 0, MQTT_RETAIN_ONLINE, "offline");
   connectToMqtt();
 }
 
@@ -31,9 +34,20 @@ void onMqttConnect(bool sessionPresent) {
   zeroBuffer();
   sprintf(topic, "%s%s", MQTT_ROOT_TOPIC, "command");
   mqttClient.subscribe(topic, 2);
+  mqttPublishOnline();
   mqttPublishStatus();
   mqttPublishVolume();
   mqttPublishPlaylist();
+}
+
+void mqttPublishOnline() {
+  if(mqttClient.connected()){
+    memset(topic, 0, 140);
+    memset(status, 0, BUFLEN*3);
+    sprintf(topic, "%s%s", MQTT_ROOT_TOPIC, "connection");
+    sprintf(status, "%s", "online");
+    mqttClient.publish(topic, 0, MQTT_RETAIN_ONLINE, status);
+  }
 }
 
 void mqttPublishStatus() {
@@ -46,7 +60,7 @@ void mqttPublishStatus() {
     config.escapeQuotes(config.station.title, title, sizeof(title)-10);
     sprintf(status, "{\"status\": %d, \"station\": %d, \"name\": \"%s\", \"title\": \"%s\", \"on\": %d}", 
             player.status()==PLAYING?1:0, config.lastStation(), name, title, config.store.dspon);
-    mqttClient.publish(topic, 0, true, status);
+    mqttClient.publish(topic, 0, MQTT_RETAIN, status);
   }
 }
 
@@ -55,7 +69,7 @@ void mqttPublishPlaylist() {
     zeroBuffer();
     sprintf(topic, "%s%s", MQTT_ROOT_TOPIC, "playlist");
     sprintf(status, "http://%s%s", config.ipToStr(WiFi.localIP()), PLAYLIST_PATH);
-    mqttClient.publish(topic, 0, true, status);
+    mqttClient.publish(topic, 0, MQTT_RETAIN, status);
   }
 }
 
@@ -66,7 +80,7 @@ void mqttPublishVolume(){
     memset(vol, 0, 5);
     sprintf(topic, "%s%s", MQTT_ROOT_TOPIC, "volume");
     sprintf(vol, "%d", config.store.volume);
-    mqttClient.publish(topic, 0, true, vol);
+    mqttClient.publish(topic, 0, MQTT_RETAIN, vol);
   }
 }
 
